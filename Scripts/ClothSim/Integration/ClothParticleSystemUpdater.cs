@@ -61,7 +61,7 @@ namespace ClothSim.Integration
                 m_clothParticleSystem.SetPosition(i, m_clothParticleObjects[i].transform.position);
             }
 
-            m_clothParticleSystem.FixedStep(Time.deltaTime);
+            m_clothParticleSystem.Step(Time.deltaTime);
 
             for (int i = 0; i < m_clothParticleObjects.Length; ++i)
             {

@@ -166,7 +166,7 @@ namespace ClothSim.Physics
             }
         }
 
-        public void FixedStep(float deltaTime)
+        public void Step(float deltaTime)
         {
             UpdateForces(deltaTime);
             Verlet(deltaTime);
@@ -228,9 +228,11 @@ namespace ClothSim.Physics
         public float Length;
     }
     /// <summary>
-    /// Settings for current cloth setup
+    /// Initialization Settings for current cloth setup
     /// here you can set:
     /// 1. Gravity
+    /// 2. Constraints
+    /// 3. Particles Properties
     /// </summary>
     public class ParticleClothSettings
     {
