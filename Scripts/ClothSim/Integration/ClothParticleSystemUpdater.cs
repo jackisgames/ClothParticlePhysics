@@ -9,13 +9,14 @@ namespace ClothSim.Integration
     {
         private ClothParticleSystem m_clothParticleSystem;
         private ClothParticleObject[] m_clothParticleObjects;
-
+        [Range(0f,1f)]
+        public float m_resolveQuality = .4f;
 
         private void Start()
         {
             m_clothParticleObjects = GetComponentsInChildren<ClothParticleObject>();
-            ClothParticleConstraints[] clothParticleConstraints = GetComponentsInChildren<ClothParticleConstraints>();
 
+            ClothParticleConstraints[] clothParticleConstraints = GetComponentsInChildren<ClothParticleConstraints>();
             ParticleClothSettings particleSettings=new ParticleClothSettings();
 
             ParticleData[] particleDatas=new ParticleData[m_clothParticleObjects.Length];
@@ -38,7 +39,7 @@ namespace ClothSim.Integration
                     if (obj.ValidConnection(j))
                     {
                         ClothParticleObject other = obj.OtherClothParticles[j];
-                        ConstraintData constraintData=new ConstraintData();
+                        ConstraintData constraintData = new ConstraintData();
                         constraintData.ParticleAIndex = indexA;
                         constraintData.ParticleBIndex = other.Index;
                         constraintData.Length = Vector3.Distance(obj.transform.position,other.transform.position);
@@ -48,20 +49,23 @@ namespace ClothSim.Integration
 
             }
 
+            particleSettings.ResolverThreshold = 1 - m_resolveQuality;
             particleSettings.SetGravity(0, -10, 0);
             particleSettings.SetParticles(particleDatas,constraintDatas.ToArray());
 
-            m_clothParticleSystem=new ClothParticleSystem(particleSettings);
+            m_clothParticleSystem = new ClothParticleSystem(particleSettings);
         }
 
-        private void Update()
+
+
+        private void FixedUpdate()
         {
             for (int i = 0; i < m_clothParticleObjects.Length; ++i)
             {
                 m_clothParticleSystem.SetPosition(i, m_clothParticleObjects[i].transform.position);
             }
 
-            m_clothParticleSystem.Step(Time.deltaTime);
+            m_clothParticleSystem.Step(Time.fixedDeltaTime);
 
             for (int i = 0; i < m_clothParticleObjects.Length; ++i)
             {

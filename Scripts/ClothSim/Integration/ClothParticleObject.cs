@@ -6,6 +6,7 @@ namespace ClothSim.Integration
     {
         public bool Kinematic;
         public float Mass;
+
         public int Index { get; set; }
 
         private void OnDrawGizmos()

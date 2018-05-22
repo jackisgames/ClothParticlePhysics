@@ -11,6 +11,7 @@ namespace ClothSim.Integration
         public ClothParticleObject[] OtherClothParticles
         {
             get { return m_otherClothParticles; }
+            set { m_otherClothParticles = value; }
         }
 
         public bool ValidConnection(int index)

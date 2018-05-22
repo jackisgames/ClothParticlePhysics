@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Collections;
+using UnityEngine;
 
 namespace ClothSim.Physics
 {
     public class ClothParticleSystem
     {
+        private const int ConstraintResolveMax = 25;
         private readonly int m_numParticles;
 
         private readonly float[] m_x;
@@ -21,12 +24,12 @@ namespace ClothSim.Physics
         private readonly float[] m_fy;
         private readonly float[] m_fz;
 
-        private float m_gx;
-        private float m_gy;
-        private float m_gz;
+        private readonly float m_gx;
+        private readonly float m_gy;
+        private readonly float m_gz;
 
-        private ConstraintData[] m_constraints;
-
+        private readonly ConstraintData[] m_constraints;
+        private readonly float m_resolveTarget;
 
         public ClothParticleSystem(ParticleClothSettings settings)
         {
@@ -51,6 +54,8 @@ namespace ClothSim.Physics
 
             m_constraints = settings.Constraints;
 
+            m_resolveTarget = settings.Constraints.Length * settings.ResolverThreshold;
+
             for (int i = 0; i < m_numParticles; ++i)
             {
                 ParticleData p = settings.Particles[i];
@@ -71,7 +76,8 @@ namespace ClothSim.Physics
                 float fy = m_fy[i];
                 float fz = m_fz[i];
 
-                //apply gravity
+                //todo apply forces
+
                 m_fx[i] = fx;
                 m_fy[i] = fy;
                 m_fz[i] = fz;
@@ -92,11 +98,14 @@ namespace ClothSim.Physics
                 float tx = x;
                 float ty = y;
                 float tz = z;
+
+                
                 //prev
                 float px = m_px[i];
                 float py = m_py[i];
                 float pz = m_pz[i];
-                //force
+
+                //force + gravity
                 float fx = m_fx[i] + m_gx;
                 float fy = m_fy[i] + m_gy;
                 float fz = m_fz[i] + m_gz;
@@ -118,57 +127,92 @@ namespace ClothSim.Physics
 
         private void UpdateConstraints(float dt)
         {
-            for (int i = 0; i < m_constraints.Length; ++i)
+            float maxDiff = m_constraints.Length;
+            int resolveCount = 0;
+            while (maxDiff > m_resolveTarget)
             {
-                ConstraintData constraint = m_constraints[i];
 
-                float x1 = m_x[constraint.ParticleAIndex];
-                float y1 = m_y[constraint.ParticleAIndex];
-                float z1 = m_z[constraint.ParticleAIndex];
+                maxDiff = 0;
+                for (int i = 0; i < m_constraints.Length; ++i)
+                {
+                    ConstraintData constraint = m_constraints[i];
 
-                float x2 = m_x[constraint.ParticleBIndex];
-                float y2 = m_y[constraint.ParticleBIndex];
-                float z2 = m_z[constraint.ParticleBIndex];
+                    float x1 = m_x[constraint.ParticleAIndex];
+                    float y1 = m_y[constraint.ParticleAIndex];
+                    float z1 = m_z[constraint.ParticleAIndex];
 
-                bool kinematic1 = m_kinematic[constraint.ParticleAIndex];
-                bool kinematic2 = m_kinematic[constraint.ParticleBIndex];
+                    float x2 = m_x[constraint.ParticleBIndex];
+                    float y2 = m_y[constraint.ParticleBIndex];
+                    float z2 = m_z[constraint.ParticleBIndex];
 
-                //both are kinematic ignore
-                if (kinematic1 && kinematic2)
-                    continue;
+                    bool kinematic1 = m_kinematic[constraint.ParticleAIndex];
+                    bool kinematic2 = m_kinematic[constraint.ParticleBIndex];
 
-                float mass1 = kinematic1 ? 0 : m_mass[constraint.ParticleAIndex];
-                float mass2 = kinematic2 ? 0 : m_mass[constraint.ParticleBIndex];
-                float totalMass = mass1 + mass2;
-                mass1 /= totalMass;
-                mass2 /= totalMass;
+                    //both are kinematic ignore
+                    if (kinematic1 && kinematic2)
+                        continue;
 
-                float dx = x2 - x1;
-                float dy = y2 - y1;
-                float dz = z2 - z1;
+                    float mass1 = m_mass[constraint.ParticleAIndex];
+                    float mass2 = m_mass[constraint.ParticleBIndex];
+                    float totalMass = mass1 + mass2;
+                    mass1 /= totalMass;
+                    mass2 /= totalMass;
+                    if (kinematic1)
+                    {
+                        mass1 = 0;
+                        mass2 = 1f;
+                    }
+                    else if (kinematic2)
+                    {
+                        mass1 = 1f;
+                        mass2 = 0;
+                    }
+                    else
+                    {
+                        mass1 = 1f - mass1;
+                        mass2 = 1f - mass2;
+                    }
 
-                float deltaLength = (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
-                float diff = (deltaLength - constraint.Length) / (deltaLength);
-
-                dx *= diff;
-                dy *= diff;
-                dz *= diff;
 
 
-                m_x[constraint.ParticleAIndex] = x1 + dx * mass1;
-                m_y[constraint.ParticleAIndex] = y1 + dy * mass1;
-                m_z[constraint.ParticleAIndex] = z1 + dz * mass1;
+                    float dx = x2 - x1;
+                    float dy = y2 - y1;
+                    float dz = z2 - z1;
 
-                m_x[constraint.ParticleBIndex] = x2 - dx * mass2;
-                m_y[constraint.ParticleBIndex] = y2 - dy * mass2;
-                m_z[constraint.ParticleBIndex] = z2 - dz * mass2;
+                    float deltaLength = (float) Math.Sqrt(dx * dx + dy * dy + dz * dz);
+                    float diff = 0;
+                    if (deltaLength >= constraint.Length)
+                        diff = (deltaLength - constraint.Length) / (deltaLength);
 
+                    dx *= diff;
+                    dy *= diff;
+                    dz *= diff;
+
+                    
+
+                    m_x[constraint.ParticleAIndex] = x1 + dx * mass1;
+                    m_y[constraint.ParticleAIndex] = y1 + dy * mass1;
+                    m_z[constraint.ParticleAIndex] = z1 + dz * mass1;
+
+                    m_x[constraint.ParticleBIndex] = x2 - dx * mass2;
+                    m_y[constraint.ParticleBIndex] = y2 - dy * mass2;
+                    m_z[constraint.ParticleBIndex] = z2 - dz * mass2;
+
+                    maxDiff += diff;
+
+                }
+                Debug.Log(maxDiff+" "+m_resolveTarget);
+                resolveCount++;
+                if (resolveCount == ConstraintResolveMax)
+                {
+                    break;
+                }
             }
         }
 
         public void Step(float deltaTime)
         {
-            UpdateForces(deltaTime);
+            //UpdateForces(deltaTime);
             Verlet(deltaTime);
             UpdateConstraints(deltaTime);
         }
@@ -187,7 +231,7 @@ namespace ClothSim.Physics
 
         public void SetPosition(int index, float x, float y, float z)
         {
-            if (index >= m_numParticles)
+            if (index >= m_numParticles||!m_kinematic[index])
             {
                 return;
             }
@@ -233,6 +277,7 @@ namespace ClothSim.Physics
     /// 1. Gravity
     /// 2. Constraints
     /// 3. Particles Properties
+    /// 4. particle constraints resolver quality
     /// </summary>
     public class ParticleClothSettings
     {
@@ -243,6 +288,8 @@ namespace ClothSim.Physics
         private float m_gy;
         private float m_gz;
 
+        private float m_resolverThreshold = .85f;
+
         public ParticleData[] Particles
         {
             get { return m_particles; }
@@ -251,6 +298,16 @@ namespace ClothSim.Physics
         public ConstraintData[] Constraints
         {
             get { return m_constraints; }
+        }
+
+        /// <summary>
+        /// resolve threshold for constraint value between 0 and 1
+        /// setting it to 0 or 1 might cause an issue
+        /// </summary>
+        public float ResolverThreshold
+        {
+            get { return m_resolverThreshold; }
+            set { m_resolverThreshold = value; }
         }
 
 
@@ -272,6 +329,41 @@ namespace ClothSim.Physics
         {
             m_particles = particles;
             m_constraints = constraints;
+
+            SortByWeight comparer = new SortByWeight(m_particles);
+            Array.Sort(m_constraints, comparer);
+        }
+
+        
+    }
+
+    class SortByWeight : IComparer
+    {
+        private ParticleData[] m_particles;
+
+        internal SortByWeight(ParticleData[] particles)
+        {
+            m_particles = particles;
+        }
+        public int Compare(object x, object y)
+        {
+            ConstraintData a = (ConstraintData)x;
+            ConstraintData b = (ConstraintData)y;
+
+            ParticleData pa1 = m_particles[a.ParticleAIndex];
+            ParticleData pa2 = m_particles[a.ParticleBIndex];
+
+            ParticleData pb1 = m_particles[b.ParticleAIndex];
+            ParticleData pb2 = m_particles[b.ParticleBIndex];
+
+            if (pa1.IsKinematic || pa2.IsKinematic)
+                return -1;
+            if (pb1.IsKinematic || pb2.IsKinematic)
+                return 1;
+
+            if (Math.Min(pa1.Mass, pa2.Mass) < Math.Min(pb1.Mass, pb2.Mass))
+                return -1;
+            return 1;
         }
     }
 }

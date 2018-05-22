@@ -1,5 +1,8 @@
 # ClothParticlePhysics
 Cloth Particle Physics
 
+I added a cloth setup window to help you getting started
+it's in "Window/ClothSetup"
+
 Demo video
-https://www.youtube.com/watch?v=xx2BcL5NGy0
+https://youtu.be/MU7AgdYEoM4
