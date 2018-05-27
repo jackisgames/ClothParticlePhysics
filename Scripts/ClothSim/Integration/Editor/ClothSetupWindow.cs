@@ -36,8 +36,10 @@ namespace ClothSim.Integration
             if (GUILayout.Button("Create"))
             {
                 ClothParticleObject[,] particleMapping = new ClothParticleObject[m_sizeX, m_sizeY];
+                GameObject particlePhysicUpdater=new GameObject("ParticlePhysics");
+                particlePhysicUpdater.AddComponent<ClothParticleSystemUpdater>();
                 GameObject cloth = new GameObject("Cloth");
-                cloth.AddComponent<ClothParticleSystemUpdater>();
+                cloth.transform.SetParent(particlePhysicUpdater.transform);
                 for (int x = 0; x < m_sizeX; x++)
                 {
                     for (int y = 0; y < m_sizeY; y++)

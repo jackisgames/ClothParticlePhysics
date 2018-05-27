@@ -53,6 +53,15 @@ namespace ClothSim.Integration
             particleSettings.SetGravity(0, -10, 0);
             particleSettings.SetParticles(particleDatas,constraintDatas.ToArray());
 
+            //gather collision Objects
+            ICollisionIntegrator[] collisions = GetComponentsInChildren<ICollisionIntegrator>();
+            ICollisionObject[] collisionObjects = new ICollisionObject[collisions.Length];
+            for (int i = 0; i < collisions.Length; i++)
+            {
+                collisionObjects[i] = collisions[i].CollisionObject();
+            }
+            particleSettings.SetCollisions(collisionObjects);
+
             m_clothParticleSystem = new ClothParticleSystem(particleSettings);
         }
 

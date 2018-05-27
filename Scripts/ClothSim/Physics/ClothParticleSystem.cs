@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections;
-using UnityEngine;
 
 namespace ClothSim.Physics
 {
@@ -30,6 +29,8 @@ namespace ClothSim.Physics
 
         private readonly ConstraintData[] m_constraints;
         private readonly float m_resolveTarget;
+
+        private readonly ICollisionObject[] m_collisions;
 
         public ClothParticleSystem(ParticleClothSettings settings)
         {
@@ -66,6 +67,11 @@ namespace ClothSim.Physics
                 m_mass[i] = p.Mass;
                 m_kinematic[i] = p.IsKinematic;
             }
+
+            m_collisions = settings.CollisionObjects;
+
+            for (int i = 0; i < m_collisions.Length; ++i)
+                m_collisions[i].Init(this);
         }
 
         private void UpdateForces(float dt)
@@ -77,9 +83,10 @@ namespace ClothSim.Physics
                 float fz = m_fz[i];
 
                 //todo apply forces
+                float forceY = -Math.Min(m_y[i], 0);
 
                 m_fx[i] = fx;
-                m_fy[i] = fy;
+                m_fy[i] = fy+forceY;
                 m_fz[i] = fz;
             }
         }
@@ -123,6 +130,19 @@ namespace ClothSim.Physics
                 m_pz[i] = tz;
 
             }
+        }
+
+        private void UpdateCollisions(float deltaTime)
+        {
+            for (int i = 0; i < m_numParticles; ++i)
+            {
+                for (int j = 0; j < m_collisions.Length; j++)
+                {
+                    m_collisions[j].CheckCollision(i);
+                }
+            }
+
+            
         }
 
         private void UpdateConstraints(float dt)
@@ -198,10 +218,12 @@ namespace ClothSim.Physics
                     m_y[constraint.ParticleBIndex] = y2 - dy * mass2;
                     m_z[constraint.ParticleBIndex] = z2 - dz * mass2;
 
+                    
+
                     maxDiff += diff;
 
                 }
-                Debug.Log(maxDiff+" "+m_resolveTarget);
+                
                 resolveCount++;
                 if (resolveCount == ConstraintResolveMax)
                 {
@@ -215,8 +237,19 @@ namespace ClothSim.Physics
             //UpdateForces(deltaTime);
             Verlet(deltaTime);
             UpdateConstraints(deltaTime);
+            UpdateCollisions(deltaTime);
+
         }
 
+        public bool IsKinematic(int index)
+        {
+            if (index >= m_numParticles)
+            {
+                return false;
+            }
+            return m_kinematic[index];
+        }
+        
         public void GetPosition(int index,out float x,out float y,out float z)
         {
             if (index >= m_numParticles)
@@ -229,9 +262,9 @@ namespace ClothSim.Physics
             z = m_z[index];
         }
 
-        public void SetPosition(int index, float x, float y, float z)
+        public void SetPosition(int index, float x, float y, float z,bool kinematicOnly)
         {
-            if (index >= m_numParticles||!m_kinematic[index])
+            if (index >= m_numParticles || kinematicOnly && !m_kinematic[index])
             {
                 return;
             }
@@ -278,11 +311,13 @@ namespace ClothSim.Physics
     /// 2. Constraints
     /// 3. Particles Properties
     /// 4. particle constraints resolver quality
+    /// 5. collisions
     /// </summary>
     public class ParticleClothSettings
     {
         private ParticleData[] m_particles;
         private ConstraintData[] m_constraints;
+        private ICollisionObject[] m_collisionObjects;
 
         private float m_gx;
         private float m_gy;
@@ -310,6 +345,11 @@ namespace ClothSim.Physics
             set { m_resolverThreshold = value; }
         }
 
+        public ICollisionObject[] CollisionObjects
+        {
+            get { return m_collisionObjects; }
+        }
+
 
         public void SetGravity(float x, float y, float z)
         {
@@ -323,6 +363,11 @@ namespace ClothSim.Physics
             x = m_gx;
             y = m_gy;
             z = m_gz;
+        }
+
+        public void SetCollisions(ICollisionObject[] collisions)
+        {
+            m_collisionObjects = collisions;
         }
 
         public void SetParticles(ParticleData[] particles,ConstraintData[] constraints)
@@ -365,5 +410,67 @@ namespace ClothSim.Physics
                 return -1;
             return 1;
         }
+    }
+
+    class PlaneCollider : ICollisionObject
+    {
+        private float x;
+        private float y;
+        private float z;
+
+        private float m_nX;
+        private float m_nY = 1;
+        private float m_nZ;
+
+        private ClothParticleSystem m_particleSystem;
+
+        public void Init(ClothParticleSystem particleSystem)
+        {
+            m_particleSystem = particleSystem;
+        }
+
+        public void CheckCollision(int index)
+        {
+            if(m_particleSystem.IsKinematic(index))
+                return;
+
+            float px, py, pz;
+            m_particleSystem.GetPosition(index, out px, out py, out pz);
+
+            float dx = px - x;
+            float dy = py - y;
+            float dz = pz - z;
+
+            float dot = m_nX * dx + m_nY * dy + m_nZ * dz;
+
+            if (dot <= 0)
+            {
+                px = px - dot * m_nX;
+                py = py - dot * m_nY;
+                pz = pz - dot * m_nZ;
+                m_particleSystem.SetPosition(index, px, py, pz,false);
+            }
+        }
+
+        public void SetPosition(float x, float y, float z)
+        {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+        public void SetNormal(float x, float y, float z)
+        {
+            m_nX = x;
+            m_nY = y;
+            m_nZ = z;
+        }
+    }
+
+    public interface ICollisionObject
+    {
+        void Init(ClothParticleSystem particleSystem);
+        void CheckCollision(int index);
+        void SetPosition(float x, float y, float z);
     }
 }

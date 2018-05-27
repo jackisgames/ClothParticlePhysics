@@ -21,7 +21,7 @@ namespace ClothSim.Integration
         }
         public static void SetPosition(this ClothParticleSystem physicSystem, int index,Vector3 position)
         {
-            physicSystem.SetPosition(index, position.x, position.y, position.z);
+            physicSystem.SetPosition(index, position.x, position.y, position.z,true);
         }
     }
 }
