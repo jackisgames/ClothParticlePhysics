@@ -83,10 +83,12 @@ namespace ClothSim.Physics
                 float fz = m_fz[i];
 
                 //todo apply forces
-                float forceY = -Math.Min(m_y[i], 0);
+                fx = m_gx;
+                fy = m_gy;
+                fz = m_gz;
 
                 m_fx[i] = fx;
-                m_fy[i] = fy+forceY;
+                m_fy[i] = fy;
                 m_fz[i] = fz;
             }
         }
@@ -113,9 +115,9 @@ namespace ClothSim.Physics
                 float pz = m_pz[i];
 
                 //force + gravity
-                float fx = m_fx[i] + m_gx;
-                float fy = m_fy[i] + m_gy;
-                float fz = m_fz[i] + m_gz;
+                float fx = m_fx[i];
+                float fy = m_fy[i];
+                float fz = m_fz[i];
 
                 x += x - px + fx * dt * dt;
                 y += y - py + fy * dt * dt;
@@ -234,9 +236,9 @@ namespace ClothSim.Physics
 
         public void Step(float deltaTime)
         {
-            //UpdateForces(deltaTime);
-            Verlet(deltaTime);
             UpdateConstraints(deltaTime);
+            Verlet(deltaTime);
+            UpdateForces(deltaTime);
             UpdateCollisions(deltaTime);
 
         }
@@ -260,6 +262,29 @@ namespace ClothSim.Physics
             x = m_x[index];
             y = m_y[index];
             z = m_z[index];
+        }
+        public void AddForce(int index, float x, float y, float z)
+        {
+            if (index >= m_numParticles)
+            {
+                return;
+            }
+
+            m_fx[index] = m_fx[index] + x;
+            m_fy[index] = m_fy[index] + y;
+            m_fz[index] = m_fz[index] + z;
+        }
+
+        public void SetForce(int index, float x, float y, float z)
+        {
+            if (index >= m_numParticles)
+            {
+                return;
+            }
+
+            m_fx[index] = x;
+            m_fy[index] = y;
+            m_fz[index] = z;
         }
 
         public void SetPosition(int index, float x, float y, float z,bool kinematicOnly)
@@ -412,6 +437,60 @@ namespace ClothSim.Physics
         }
     }
 
+    class SphereCollider:ICollisionObject
+    {
+        private float x;
+        private float y;
+        private float z;
+
+        private float m_radius;
+        private float m_radiusSqrt;
+
+        private ClothParticleSystem m_particleSystem;
+
+        public void Init(ClothParticleSystem particleSystem)
+        {
+            m_particleSystem = particleSystem;
+        }
+
+        public void CheckCollision(int index)
+        {
+            if (m_particleSystem.IsKinematic(index))
+                return;
+
+            float px, py, pz;
+            m_particleSystem.GetPosition(index, out px, out py, out pz);
+
+            float dx = px - x;
+            float dy = py - y;
+            float dz = pz - z;
+
+            float distSqrt = dx * dx + dy * dy + dz * dz;
+            if (distSqrt <= m_radiusSqrt)
+            {
+                float penetration = (m_radiusSqrt/distSqrt) * (m_radiusSqrt - distSqrt) / m_radiusSqrt;
+
+                dx *= penetration;
+                dy *= penetration;
+                dz *= penetration;
+                m_particleSystem.SetPosition(index, px + dx, py + dy, pz + dz, false);
+                m_particleSystem.SetForce(index, 0, 0, 0);
+            }
+        }
+
+        public void SetRadius(float radius)
+        {
+            m_radius = radius;
+            m_radiusSqrt = m_radius * m_radius;
+        }
+        public void SetPosition(float x, float y, float z)
+        {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+    }
+
     class PlaneCollider : ICollisionObject
     {
         private float x;
@@ -445,10 +524,18 @@ namespace ClothSim.Physics
 
             if (dot <= 0)
             {
-                px = px - dot * m_nX;
-                py = py - dot * m_nY;
-                pz = pz - dot * m_nZ;
+                
+                float fx = dot * m_nX;
+                float fy = dot * m_nY;
+                float fz = dot * m_nZ;
+
+                px = px - fx;
+                py = py - fy;
+                pz = pz - fz;
                 m_particleSystem.SetPosition(index, px, py, pz,false);
+                m_particleSystem.SetForce(index, 0, 0, 0);
+
+                
             }
         }
 
