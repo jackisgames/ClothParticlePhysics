@@ -9,8 +9,9 @@ namespace ClothSim.Integration
     {
         private ClothParticleSystem m_clothParticleSystem;
         private ClothParticleObject[] m_clothParticleObjects;
-        [Range(0f,1f)]
-        public float m_resolveQuality = .4f;
+
+        [SerializeField]
+        private Vector3 m_gravity=new Vector3(0,-10);
 
         private void Start()
         {
@@ -42,15 +43,13 @@ namespace ClothSim.Integration
                         ConstraintData constraintData = new ConstraintData();
                         constraintData.ParticleAIndex = indexA;
                         constraintData.ParticleBIndex = other.Index;
-                        constraintData.Length = Vector3.Distance(obj.transform.position,other.transform.position);
+                        constraintData.Length = Vector3.Distance(obj.transform.position, other.transform.position);
                         constraintDatas.Push(constraintData);
                     }
                 }
 
             }
-
-            particleSettings.ResolverThreshold = 1 - m_resolveQuality;
-            particleSettings.SetGravity(0, -10, 0);
+            particleSettings.SetGravity(m_gravity.x, m_gravity.y, m_gravity.z);
             particleSettings.SetParticles(particleDatas,constraintDatas.ToArray());
 
             //gather collision Objects
